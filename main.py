@@ -86,14 +86,13 @@ def format_security_requirements(checked_items):
         return ""
     
     security_text = "\n\n보안 요구사항:\n"
-    security_text += "다음 보안 요소들을 반드시 다이어그램에 포함하고 적용해주세요\n 보안요소는 구분을 위해 요소 명칭 앞에 '***'별표 라벨로 명확하게 구분해주세요:\n"
+    security_text += "다음 보안 요소들을 반드시 다이어그램에 포함하고 '*'별표 라벨을 앞뒤로 하여여 명확하게 구분해주세요:\n"
     
     for i, item in enumerate(checked_items, 1):
         # 예시 부분 제거하고 핵심 내용만 추출
         clean_item = item.split(" (예:")[0] if " (예:" in item else item
         security_text += f"{i}. {clean_item}\n"
     
-    security_text += "\n위 보안 요구사항들중 모호한 사항들들을 AWS 모범사례에 따라 다이어그램에 시각적으로 표현해주세요."
     
     return security_text
 
@@ -118,7 +117,7 @@ class AmazonQClient:
 1. AWS 서비스 아이콘을 사용하여 시각적 다이어그램 생성
 2. 서비스 간 연결 관계를 명확히 표시
 3. generated-diagrams 폴더에 PNG 파일로 저장
-4. 파일명은 "aws_architecture_diagram.png" 또는 유사한 이름 사용
+
 
 다이어그램을 생성하고 저장해주세요."""
     
@@ -358,6 +357,52 @@ def clear_tree_structure():
     st.success("트리 구조가 초기화되었습니다!")
 
 # =========================================
+# 보안 분석 함수
+# =========================================
+def analyze_security_architecture(tree_structure, checked_items):
+    """현재 아키텍처의 보안 구성요소를 분석하고 추가 권장사항을 제공합니다."""
+    if not api_ready or not model:
+        return "❌ Gemini API가 준비되지 않았습니다."
+    
+    try:
+        # 체크된 보안 항목들을 텍스트로 변환
+        security_items_text = ""
+        if checked_items:
+            security_items_text = "\n\n현재 적용된 보안 요소들:\n"
+            for i, item in enumerate(checked_items, 1):
+                security_items_text += f"{i}. {item}\n"
+        else:
+            security_items_text = "\n\n현재 적용된 보안 요소: 없음"
+        
+        # Gemini에게 보안 분석 요청
+        prompt = f"""
+다음 AWS 클라우드 아키텍처의 보안 구성요소를 분석해주세요:
+
+아키텍처 구조:
+{tree_structure}{security_items_text}
+
+분석 요청사항:
+1. 현재 아키텍처에서 각 보안 구성요소가 어떤 역할을 하는지 설명
+2. 현재 구성에서 보안 취약점이나 개선점이 있는지 분석
+3. 추가로 구성하면 좋을 보안 요소들을 제안
+4. 각 보안 요소의 중요도와 우선순위를 평가
+
+응답 형식:
+- 현재 보안 구성요소 분석
+- 보안 취약점 및 개선점
+- 추가 권장 보안 요소
+- 보안 강화 우선순위
+
+AWS 보안 모범사례를 기준으로 전문적이고 실용적인 조언을 제공해주세요.
+"""
+        
+        response = model.generate_content(prompt)
+        return response.text if response.text else "보안 분석을 완료할 수 없습니다."
+        
+    except Exception as e:
+        return f"❌ 보안 분석 중 오류가 발생했습니다: {str(e)}"
+
+# =========================================
 # 다이어그램 생성 함수
 # =========================================
 def create_diagram_from_tree():
@@ -381,6 +426,7 @@ def create_diagram_from_tree():
         st.info("ℹ️ 체크된 보안 항목이 없습니다. 기본 보안 설정으로 다이어그램을 생성합니다.")
     
     try:
+        # 1. Amazon Q를 통한 다이어그램 생성
         with st.spinner("🎨 Amazon Q를 통해 다이어그램을 생성하고 있습니다..."):
             result = amazon_q_client.generate_diagram(current_tree)
             
@@ -397,16 +443,27 @@ def create_diagram_from_tree():
                     ss["current_diagram"] = str(latest_diagram)
                     # 다이어그램 생성 완료 플래그 설정
                     ss["diagram_created"] = True
-                    # 페이지 새로고침하여 다이어그램 표시
-                    st.rerun()
                 else:
                     st.info("📁 다이어그램 파일을 확인 중입니다...")
                     
             else:
                 st.error("❌ 다이어그램 생성에 실패했습니다.")
+        
+        # 2. Gemini를 통한 보안 분석
+        with st.spinner("🔍 보안 아키텍처를 분석하고 있습니다..."):
+            security_analysis = analyze_security_architecture(current_tree, checked_items)
+            # 보안 분석 결과를 세션 상태에 저장
+            ss["security_analysis"] = security_analysis
+            # 분석 완료 시간 저장
+            from datetime import datetime
+            ss["analysis_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            st.success("✅ 보안 분석이 완료되었습니다!")
+        
+        # 페이지 새로고침하여 결과 표시
+        st.rerun()
                 
     except Exception as e:
-        st.error(f"❌ 다이어그램 생성 중 오류가 발생했습니다: {str(e)}")
+        st.error(f"❌ 처리 중 오류가 발생했습니다: {str(e)}")
 
 # =========================================
 # 다이어그램 표시 함수
@@ -745,6 +802,12 @@ if "current_diagram" not in st.session_state:
 if "diagram_created" not in st.session_state:
     st.session_state["diagram_created"] = False
 
+if "security_analysis" not in st.session_state:
+    st.session_state["security_analysis"] = ""
+
+if "board_suggestions" not in st.session_state:
+    st.session_state["board_suggestions"] = ""
+
 ss = st.session_state
 
 # =========================================
@@ -830,13 +893,37 @@ with col1:
 
 with col2:
     with st.expander("✨ 보안 요소 설명서", expanded=False):
-        recs = st.text_area(
-            "추가 고려 사항 입력", 
-            value=ss.get("board_suggestions", ""), 
-            height=200, 
-            label_visibility="collapsed"
-        )
-        ss["board_suggestions"] = recs
+        # 보안 분석 결과가 있으면 표시
+        if ss.get("security_analysis"):
+            st.markdown("**🔍 보안 아키텍처 분석 결과**")
+            st.markdown(ss["security_analysis"])
+            st.markdown("---")
+            
+            # 마크다운 다운로드 버튼
+            markdown_content = f"""# AWS 보안 아키텍처 분석 보고서
+
+## 현재 아키텍처 구조
+```
+{ss.get("current_tree", "아키텍처 구조가 없습니다.")}
+```
+
+## 보안 분석 결과
+{ss["security_analysis"]}
+
+## 생성일시
+{st.session_state.get("analysis_timestamp", "알 수 없음")}
+"""
+            
+            st.download_button(
+                label="📄 마크다운 다운로드",
+                data=markdown_content,
+                file_name="aws_security_analysis.md",
+                mime="text/markdown",
+                use_container_width=True
+            )
+        
+        else:
+            st.info("🔍 보안 분석 결과가 없습니다. '제작하기' 버튼을 클릭하여 분석을 시작하세요.")
 
 # 챗봇 영역
 st.markdown('<div class="chat-title">🧠 클라우드 설계 어시스턴트</div>', unsafe_allow_html=True)
