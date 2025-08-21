@@ -76,65 +76,7 @@ def get_checked_security_items():
         if st.session_state.get(f"basic_{item}", False):
             checked_items.append(item)
     
-    # 네트워크 섹션
-    network_items = [
-        "VPC 적용 여부 (예: VPC 생성, CIDR 10.0.0.0/16)",
-        "퍼블릭/프라이빗 서브넷 개수 지정 (예: AZ 2개에 퍼블릭 2개, 프라이빗 2개)",
-        "NACL 규칙 지정 (예: 모든 inbound deny, 443만 허용)",
-        "보안 그룹 규칙 명시 (예: EC2 인바운드 443만 ALB에서 허용)",
-        "VPC 엔드포인트 추가 (예: S3, DynamoDB에 대한 인터페이스 엔드포인트 생성)"
-    ]
-    
-    for item in network_items:
-        if st.session_state.get(f"network_{item}", False):
-            checked_items.append(item)
-    
-    # 트래픽 보안 섹션
-    traffic_items = [
-        "로드밸런서 HTTPS 리스너 생성 (예: ALB 443 listener)",
-        "HTTP → HTTPS 리디렉션 설정 (예: ALB 80 포트 → 443)",
-        "ACM 인증서 적용 (예: example.com ACM 인증서 연결)",
-        "WAF 추가 (예: SQLi, XSS 룰 적용)"
-    ]
-    
-    for item in traffic_items:
-        if st.session_state.get(f"traffic_{item}", False):
-            checked_items.append(item)
-    
-    # 컴퓨트 & 스토리지 섹션
-    compute_items = [
-        "EBS 암호화 활성화 (KMS 키 지정)",
-        "RDS 암호화 활성화 (KMS 키 지정 + 백업 암호화)",
-        "S3 기본 암호화 활성화 (SSE-KMS)",
-        "EFS/FSx 암호화 및 보안 그룹 연결",
-        "멀티 AZ 배포 설정 (예: RDS Multi-AZ, ALB 2 AZ)"
-    ]
-    
-    for item in compute_items:
-        if st.session_state.get(f"compute_{item}", False):
-            checked_items.append(item)
-    
-    # 접근제어 섹션
-    access_items = [
-        "IAM 역할 연결 (EC2, Lambda 최소 권한 Role)",
-        "Lambda 환경 변수 KMS 암호화 활성화",
-        "Secrets Manager 사용 (예: DB password 저장 및 rotation 설정)"
-    ]
-    
-    for item in access_items:
-        if st.session_state.get(f"access_{item}", False):
-            checked_items.append(item)
-    
-    # 로깅 & 모니터링 섹션
-    logging_items = [
-        "CloudTrail 전 리전 활성화",
-        "CloudTrail 로그 → S3 (BPA ON, SSE-KMS)",
-        "CloudTrail → CloudWatch Logs 연계"
-    ]
-    
-    for item in logging_items:
-        if st.session_state.get(f"logging_{item}", False):
-            checked_items.append(item)
+
     
     return checked_items
 
@@ -166,29 +108,19 @@ class AmazonQClient:
     
     def generate_diagram_prompt(self, tree_structure, security_requirements=""):
         """트리 구조와 보안 요구사항을 기반으로 다이어그램 생성 프롬프트 생성"""
-        # 현재 작업 디렉토리의 절대 경로 계산
-        current_dir = os.getcwd()
-        diagram_folder = os.path.join(current_dir, 'generated-diagrams')
         
-        return f"""
-다음 클라우드 아키텍처 트리 구조를 기반으로 다이어그램을 생성해주세요:
+        return f"""AWS 클라우드 아키텍처 다이어그램을 생성해주세요.
 
 아키텍처 구조:
 {tree_structure}{security_requirements}
 
-작업 내용:
-1. AWS 서비스 아이콘과 연결 관계를 포함한 시각적 아키텍처 다이어그램 생성
-2. 중복된 파일이있다면 파일명에 번호를 붙여서 저장
-3. 반드시 다음 절대 경로에 저장해주세요: {diagram_folder}
+요구사항:
+1. AWS 서비스 아이콘을 사용하여 시각적 다이어그램 생성
+2. 서비스 간 연결 관계를 명확히 표시
+3. generated-diagrams 폴더에 PNG 파일로 저장
+4. 파일명은 "aws_architecture_diagram.png" 또는 유사한 이름 사용
 
-파일 정보:
-- 파일명: [생성된_파일명.png]
-- 저장 경로: {diagram_folder}/[생성된_파일명.png]
-- 상태: 완료
-
-아키텍처 설명:
-[생성된 아키텍처에 대한 간단한 설명]
-"""
+다이어그램을 생성하고 저장해주세요."""
     
     def execute_command(self, prompt):
         """플랫폼별 명령어 실행"""
@@ -207,19 +139,11 @@ class AmazonQClient:
             # WSL이 설치되어 있는지 확인
             wsl_check = subprocess.run(['wsl', '--version'], capture_output=True, text=True)
             if wsl_check.returncode == 0:
-                # WSL 사용 - 현재 디렉토리를 WSL 경로로 변환
-                current_dir = os.getcwd()
-                # Windows 경로를 WSL 경로로 변환 (예: C:\path -> /mnt/c/path)
-                wsl_path = current_dir.replace('\\', '/')
-                if wsl_path.startswith('C:'):
-                    wsl_path = '/mnt/c' + wsl_path[2:]
-                elif wsl_path.startswith('D:'):
-                    wsl_path = '/mnt/d' + wsl_path[2:]
-                
+                # WSL 사용 - 상대 경로 사용
                 home_dir = os.path.expanduser("~")
                 local_bin = os.path.join(home_dir, ".local", "bin")
                 # WSL에서 현재 디렉토리로 이동 후 명령 실행
-                cmd = f'cd "{wsl_path}" && source ~/.bashrc && export PATH=$PATH:{local_bin} && printf "y\\ny\\ny\\n" | {AMAZON_Q_PATH} chat "{prompt}"'
+                cmd = f'cd . && source ~/.bashrc && export PATH=$PATH:{local_bin} && printf "y\\ny\\ny\\n" | {AMAZON_Q_PATH} chat "{prompt}"'
                 
                 return subprocess.run([
                     'wsl', '-e', 'bash', '-c', cmd
@@ -251,6 +175,9 @@ class AmazonQClient:
     def generate_diagram(self, tree_structure):
         """Amazon Q CLI를 통해 다이어그램 생성 요청"""
         try:
+            # Amazon Q CLI 경로 확인
+            st.info(f"🔧 Amazon Q CLI 경로: {AMAZON_Q_PATH}")
+            
             checked_items = get_checked_security_items()
             security_requirements_text = format_security_requirements(checked_items)
             
@@ -259,14 +186,23 @@ class AmazonQClient:
                 prompt = self.generate_diagram_prompt(tree_structure, security_requirements_text)
             else:
                 prompt = self.generate_diagram_prompt(tree_structure, "")
+            
+            # 디버깅을 위해 프롬프트 출력
+            st.info("🔍 생성된 프롬프트:")
+            st.code(prompt, language="text")
                 
             result = self.execute_command(prompt)
             
             if result and result.returncode == 0:
+                st.success("✅ Amazon Q CLI 실행 성공")
                 return result.stdout or ""
             else:
                 if result:
-                    st.error(f"Amazon Q CLI 오류: {result.stderr}")
+                    st.error(f"❌ Amazon Q CLI 오류 (코드: {result.returncode})")
+                    st.error(f"오류 메시지: {result.stderr}")
+                    st.info(f"출력: {result.stdout}")
+                else:
+                    st.error("❌ Amazon Q CLI 실행 결과가 없습니다")
                 return None
                 
         except Exception as e:
@@ -280,9 +216,8 @@ class DiagramManager:
     """다이어그램 파일 관리"""
     
     def __init__(self):
-        # 절대 경로 사용
-        current_dir = os.getcwd()
-        self.diagram_folder = Path(os.path.join(current_dir, 'generated-diagrams'))
+        # generated-diagrams 폴더 사용
+        self.diagram_folder = Path('generated-diagrams')
         self.diagram_folder.mkdir(parents=True, exist_ok=True)
     
     def find_latest_diagram(self):
@@ -478,30 +413,60 @@ def create_diagram_from_tree():
 # =========================================
 def display_diagram():
     """현재 다이어그램을 표시합니다."""
+    
+    def _encode_image_to_base64(image_path):
+        """이미지를 base64로 인코딩합니다."""
+        import base64
+        try:
+            with open(image_path, "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode()
+        except:
+            return ""
+    
     current_diagram = ss.get("current_diagram", "")
     
     if current_diagram and os.path.exists(current_diagram):
         try:
             # 다이어그램 이미지를 460px 높이의 카드로 감싸서 표시
+            # 파일 경로를 상대 경로로 변환
+            relative_path = os.path.relpath(current_diagram)
             st.markdown(
-                '<div class="card" style="height:460px; display:flex; align-items:center; justify-content:center; overflow:hidden;">',
+                f'''
+                <div class="card" style="height:460px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                    <img src="data:image/png;base64,{_encode_image_to_base64(current_diagram)}" 
+                         style="max-width: 100%; max-height: 100%; object-fit: contain;" 
+                         alt="생성된 아키텍처 다이어그램">
+                </div>
+                ''',
                 unsafe_allow_html=True
             )
-            st.image(current_diagram, caption="생성된 아키텍처 다이어그램", use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
                     
         except Exception as e:
             st.error(f"❌ 다이어그램 표시 중 오류가 발생했습니다: {str(e)}")
             # 오류 발생 시 다이어그램 정보 초기화
             ss["current_diagram"] = ""
     else:
-        # 다이어그램이 없을 때 기본 메시지 표시
-        st.markdown(
-            '<div class="card" style="height:460px; display:flex; align-items:center; justify-content:center; color:#888;">'
-            '여기에 다이어그램이 표시됩니다.'
-            '</div>',
-            unsafe_allow_html=True
-        )
+        # 다이어그램이 없을 때 샘플 이미지 또는 기본 메시지 표시
+        try:
+            # 샘플 이미지 URL 사용 (테스트용)
+            sample_image_url = "https://static.vecteezy.com/system/resources/previews/022/721/557/original/google-logo-for-search-site-free-png.png"
+            # HTML로 이미지를 직접 포함시켜 컨테이너 안에 표시
+            st.markdown(
+                f'''
+                <div class="card" style="height:460px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                    <img src="{sample_image_url}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="샘플 아키텍처 다이어그램">
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
+        except:
+            # 이미지 로드 실패 시 기본 메시지
+            st.markdown(
+                '<div class="card" style="height:460px; display:flex; align-items:center; justify-content:center; color:#888;">'
+                '여기에 다이어그램이 표시됩니다.'
+                '</div>',
+                unsafe_allow_html=True
+            )
 
 # =========================================
 # 페이지 레이아웃
@@ -823,7 +788,7 @@ with colB:
             # 다이어그램 파일이 있을 때만 다운로드 버튼 표시
             with open(ss["current_diagram"], "rb") as file:
                 st.download_button(
-                    label="📥 다운로드",
+                    label="다운로드",
                     data=file.read(),
                     file_name=os.path.basename(ss["current_diagram"]),
                     mime="image/png",
@@ -861,65 +826,7 @@ with col1:
         for item in basic_checklist:
             st.checkbox(item, key=f"basic_{item}")
         
-        st.markdown("---")
-        
-        # Amazon Q 지시용 상세 체크리스트
-        st.markdown("**🌐 Amazon Q 지시용 클라우드 보안 아키텍처 옵션**")
-        
-        # 네트워크 섹션
-        st.markdown("**📡 네트워크**")
-        network_items = [
-            "VPC 적용 여부",
-            "퍼블릭/프라이빗 서브넷 개수 지정",
-            "NACL 규칙 지정",
-            "보안 그룹 규칙 명시",
-            "VPC 엔드포인트 추가"
-        ]
-        for item in network_items:
-            st.checkbox(item, key=f"network_{item}")
-        
-        # 트래픽 보안 섹션
-        st.markdown("**🛡️ 트래픽 보안**")
-        traffic_items = [
-            "로드밸런서 HTTPS 리스너 생성",
-            "HTTP → HTTPS 리디렉션 설정",
-            "ACM 인증서 적용",
-            "WAF 추가"
-        ]
-        for item in traffic_items:
-            st.checkbox(item, key=f"traffic_{item}")
-        
-        # 컴퓨트 & 스토리지 섹션
-        st.markdown("**💻 컴퓨트 & 스토리지**")
-        compute_items = [
-            "EBS 암호화 활성화",
-            "RDS 암호화 활성화",
-            "S3 기본 암호화 활성화",
-            "EFS/FSx 암호화 및 보안 그룹 연결",
-            "멀티 AZ 배포 설정"
-        ]
-        for item in compute_items:
-            st.checkbox(item, key=f"compute_{item}")
-        
-        # 접근제어 섹션
-        st.markdown("**🔐 접근제어**")
-        access_items = [
-            "IAM 역할 연결",
-            "Lambda 환경 변수 KMS 암호화 활성화",
-            "Secrets Manager 사용"
-        ]
-        for item in access_items:
-            st.checkbox(item, key=f"access_{item}")
-        
-        # 로깅 & 모니터링 섹션
-        st.markdown("**📊 로깅 & 모니터링**")
-        logging_items = [
-            "CloudTrail 전 리전 활성화",
-            "CloudTrail 로그 → S3 (BPA ON, SSE-KMS)",
-            "CloudTrail → CloudWatch Logs 연계"
-        ]
-        for item in logging_items:
-            st.checkbox(item, key=f"logging_{item}")
+
 
 with col2:
     with st.expander("✨ 보안 요소 설명서", expanded=False):
