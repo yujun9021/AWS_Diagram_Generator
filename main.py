@@ -61,9 +61,7 @@ def get_checked_security_items():
     basic_checklist = [
         "VPC 적용 여부",
         "퍼블릭,프라이빗 서브넷 분리", 
-        "보안 그룹 설정",
-        "IAM 권한 최소화",
-        "데이터 암호화",
+        "데이터 암호화",        
         "로드밸런서 설정",
         "WAF 설정",
         "CloudFront 설정",
@@ -85,8 +83,8 @@ def format_security_requirements(checked_items):
     if not checked_items:
         return ""
     
-    security_text = "\n\n보안 요구사항:\n"
-    security_text += "다음 보안 요소들을 반드시 다이어그램에 포함하고 '*'별표 라벨을 앞뒤로 하여여 명확하게 구분해주세요:\n"
+    security_text = "\n\nSecurity Requirements:\n"
+    security_text += "Please include the following security elements in the diagram and clearly label them with '*' asterisks for distinction:\n"
     
     for i, item in enumerate(checked_items, 1):
         # 예시 부분 제거하고 핵심 내용만 추출
@@ -108,18 +106,17 @@ class AmazonQClient:
     def generate_diagram_prompt(self, tree_structure, security_requirements=""):
         """트리 구조와 보안 요구사항을 기반으로 다이어그램 생성 프롬프트 생성"""
         
-        return f"""AWS 클라우드 아키텍처 다이어그램을 생성해주세요.
+        return f"""Generate an AWS cloud architecture diagram.
 
-아키텍처 구조:
+Architecture Structure:
 {tree_structure}{security_requirements}
 
-요구사항:
-1. AWS 서비스 아이콘을 사용하여 시각적 다이어그램 생성
-2. 서비스 간 연결 관계를 명확히 표시
-3. generated-diagrams 폴더에 PNG 파일로 저장
+Requirements:
+1. Create a visual diagram using AWS service icons
+2. Clearly show connections between services
+3. Save as PNG file in the generated-diagrams folder
 
-
-다이어그램을 생성하고 저장해주세요."""
+Please generate and save the diagram."""
     
     def execute_command(self, prompt):
         """플랫폼별 명령어 실행"""
@@ -174,9 +171,6 @@ class AmazonQClient:
     def generate_diagram(self, tree_structure):
         """Amazon Q CLI를 통해 다이어그램 생성 요청"""
         try:
-            # Amazon Q CLI 경로 확인
-            st.info(f"🔧 Amazon Q CLI 경로: {AMAZON_Q_PATH}")
-            
             checked_items = get_checked_security_items()
             security_requirements_text = format_security_requirements(checked_items)
             
@@ -185,23 +179,12 @@ class AmazonQClient:
                 prompt = self.generate_diagram_prompt(tree_structure, security_requirements_text)
             else:
                 prompt = self.generate_diagram_prompt(tree_structure, "")
-            
-            # 디버깅을 위해 프롬프트 출력
-            st.info("🔍 생성된 프롬프트:")
-            st.code(prompt, language="text")
                 
             result = self.execute_command(prompt)
             
             if result and result.returncode == 0:
-                st.success("✅ Amazon Q CLI 실행 성공")
                 return result.stdout or ""
             else:
-                if result:
-                    st.error(f"❌ Amazon Q CLI 오류 (코드: {result.returncode})")
-                    st.error(f"오류 메시지: {result.stderr}")
-                    st.info(f"출력: {result.stdout}")
-                else:
-                    st.error("❌ Amazon Q CLI 실행 결과가 없습니다")
                 return None
                 
         except Exception as e:
@@ -416,35 +399,19 @@ def create_diagram_from_tree():
     # 체크된 보안 항목들 수집
     checked_items = get_checked_security_items()
     
-    # 체크된 보안 항목들 표시
-    if checked_items:
-        st.info("🔒 적용할 보안 요소들:")
-        for i, item in enumerate(checked_items, 1):
-            clean_item = item.split(" (예:")[0] if " (예:" in item else item
-            st.write(f"{i}. {clean_item}")
-    else:
-        st.info("ℹ️ 체크된 보안 항목이 없습니다. 기본 보안 설정으로 다이어그램을 생성합니다.")
-    
     try:
         # 1. Amazon Q를 통한 다이어그램 생성
         with st.spinner("🎨 Amazon Q를 통해 다이어그램을 생성하고 있습니다..."):
             result = amazon_q_client.generate_diagram(current_tree)
             
             if result:
-                st.success("✅ 다이어그램 생성 요청이 완료되었습니다!")
-                st.info("📝 Amazon Q 응답:")
-                st.code(result, language="text")
-                
                 # 생성된 다이어그램 파일 확인
                 latest_diagram = diagram_manager.find_latest_diagram()
                 if latest_diagram:
-                    st.success(f"🎉 다이어그램 파일이 생성되었습니다: {latest_diagram.name}")
                     # 다이어그램을 세션 상태에 저장
                     ss["current_diagram"] = str(latest_diagram)
                     # 다이어그램 생성 완료 플래그 설정
                     ss["diagram_created"] = True
-                else:
-                    st.info("📁 다이어그램 파일을 확인 중입니다...")
                     
             else:
                 st.error("❌ 다이어그램 생성에 실패했습니다.")
@@ -457,7 +424,6 @@ def create_diagram_from_tree():
             # 분석 완료 시간 저장
             from datetime import datetime
             ss["analysis_timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            st.success("✅ 보안 분석이 완료되었습니다!")
         
         # 페이지 새로고침하여 결과 표시
         st.rerun()
@@ -862,8 +828,6 @@ with col1:
         basic_checklist = [
             "VPC 적용 여부",
             "퍼블릭,프라이빗 서브넷 분리", 
-            "보안 그룹 설정",
-            "IAM 권한 최소화",
             "데이터 암호화",
             "로드밸런서 설정",
             "WAF 설정",
