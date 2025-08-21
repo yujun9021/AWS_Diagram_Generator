@@ -503,27 +503,13 @@ def display_diagram():
             # 오류 발생 시 다이어그램 정보 초기화
             ss["current_diagram"] = ""
     else:
-        # 다이어그램이 없을 때 샘플 이미지 또는 기본 메시지 표시
-        try:
-            # 샘플 이미지 URL 사용 (테스트용)
-            sample_image_url = "https://static.vecteezy.com/system/resources/previews/022/721/557/original/google-logo-for-search-site-free-png.png"
-            # HTML로 이미지를 직접 포함시켜 컨테이너 안에 표시
-            st.markdown(
-                f'''
-                <div class="card" style="height:460px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-                    <img src="{sample_image_url}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="샘플 아키텍처 다이어그램">
-                </div>
-                ''',
-                unsafe_allow_html=True
-            )
-        except:
-            # 이미지 로드 실패 시 기본 메시지
-            st.markdown(
-                '<div class="card" style="height:460px; display:flex; align-items:center; justify-content:center; color:#888;">'
-                '여기에 다이어그램이 표시됩니다.'
-                '</div>',
-                unsafe_allow_html=True
-            )
+        # 다이어그램이 없을 때 기본 메시지 표시
+        st.markdown(
+            '<div class="card" style="height:460px; display:flex; align-items:center; justify-content:center; color:#888;">'
+            '여기에 다이어그램이 표시됩니다.'
+            '</div>',
+            unsafe_allow_html=True
+        )
 
 # =========================================
 # 페이지 레이아웃
